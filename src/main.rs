@@ -95,18 +95,14 @@ mod llvm {
             }
         }
 
-        pub fn print(&self) {
-            unsafe { rustc_llvm::LLVMDumpModule(self._module); }
-        }
+        pub fn print(&self) { unsafe { rustc_llvm::LLVMDumpModule(self._module); } }
     }
 
     /*************************************************************************/
     impl<'a> Builder<'a> {
         pub fn new(module: &'a mut Module) -> Builder {
             let context = module._context;
-            unsafe {
-                Builder{ _module: module, _builder: rustc_llvm::LLVMCreateBuilderInContext(context) }
-            }
+            unsafe { Builder{ _module: module, _builder: rustc_llvm::LLVMCreateBuilderInContext(context) } }
         }
 
         pub fn get_int32_type(&mut self) -> Type { unsafe { Type{ _type: rustc_llvm::LLVMInt32TypeInContext(self._module._context) } } }
@@ -120,33 +116,23 @@ mod llvm {
         }
         
         pub fn create_function(&mut self, name: &str, func_type: &FunctionType) -> Function {
-            unsafe {
-                Function{ _value: rustc_llvm::LLVMAddFunction(self._module._module, _get_string_ptr(name), func_type._type) }
-            }
+            unsafe { Function{ _value: rustc_llvm::LLVMAddFunction(self._module._module, _get_string_ptr(name), func_type._type) } }
         }
 
         pub fn create_basic_block(&mut self, name: &str, func: &mut Function) -> BasicBlock {
-            unsafe {
-                BasicBlock{ _block: rustc_llvm::LLVMAppendBasicBlockInContext(self._module._context, func._value, _get_string_ptr(name)) }
-            }
+            unsafe { BasicBlock{ _block: rustc_llvm::LLVMAppendBasicBlockInContext(self._module._context, func._value, _get_string_ptr(name)) } }
         }
 
         pub fn set_insert_point(&mut self, block: &BasicBlock) {
-            unsafe { 
-                rustc_llvm::LLVMPositionBuilderAtEnd(self._builder, block._block);
-            }
+            unsafe { rustc_llvm::LLVMPositionBuilderAtEnd(self._builder, block._block); }
         }
 
         pub fn create_add(&mut self, lhs: &Value, rhs: &Value) -> Value {
-            unsafe {
-                Value{ _value: rustc_llvm::LLVMBuildAdd(self._builder, lhs._value, rhs._value, _get_string_ptr("sum")) }
-            }
+            unsafe { Value{ _value: rustc_llvm::LLVMBuildAdd(self._builder, lhs._value, rhs._value, _get_string_ptr("sum")) } }
         }
 
         pub fn create_ret(&mut self, val: &Value) {
-            unsafe {
-                rustc_llvm::LLVMBuildRet(self._builder, val._value);
-            }
+            unsafe { rustc_llvm::LLVMBuildRet(self._builder, val._value); }
         }
 
         pub fn get_param(&mut self, function: &Function, index: u32) -> Value {
