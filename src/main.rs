@@ -1,5 +1,6 @@
 #![feature(rustc_private)]
 #![feature(libc)]
+#![feature(collections)]
 use std::mem;
 
 mod llvm {
@@ -10,6 +11,7 @@ mod llvm {
     use std::ffi::CStr;
     use std::mem;
     use std::str;
+    use std::string::String;
 
     /*************************************************************************/
     extern fn __morestack() {
@@ -174,18 +176,20 @@ mod llvm {
 
     /*************************************************************************/
     impl ExecutionEngine {
-        pub fn new(module: Module) -> ExecutionEngine {
+        pub fn new(module: Module) -> Result<ExecutionEngine, String> {
             unsafe {
                 let morestack: *const () = mem::transmute(__morestack);
                 let jit_memory_manager = rustc_llvm::LLVMRustCreateJITMemoryManager(morestack);
                 // Is this OK?
                 let engine = ExecutionEngine{ _engine: rustc_llvm::LLVMBuildExecutionEngine(module._module, jit_memory_manager), _module: module };
                 let c_error = rustc_llvm::LLVMRustGetLastError();
-                if !c_error.is_null() {
+
+                if c_error.is_null() {
+                    Ok(engine)
+                } else {
                     let error = CStr::from_ptr(c_error);
-                    println!("Error dice: {}", str::from_utf8(error.to_bytes()).unwrap());
+                    Err(String::from_str(str::from_utf8(error.to_bytes()).unwrap()))        // WTF? This is a thing?
                 }
-                engine
             }
         }
 
@@ -193,8 +197,13 @@ mod llvm {
             unsafe { rustc_llvm::LLVMExecutionEngineFinalizeObject(self._engine); self }
         }
 
-        pub fn get_pointer_to_function(&self, function: &Function) -> *const() {
-            unsafe { rustc_llvm::LLVMGetPointerToGlobal(self._engine, function._value) }
+        pub fn get_pointer_to_function(&self, function: &Function) -> Option<*const()> {
+            let fptr: *const() = unsafe { rustc_llvm::LLVMGetPointerToGlobal(self._engine, function._value) };
+            if fptr.is_null() {
+                None
+            } else {
+                Some(fptr)
+            }
         }
     }
 }
@@ -216,17 +225,16 @@ fn main() {
         builder.create_ret(&sum);
     });
 
+    println!("====================");
     module.print();
+    println!("====================");
 
-    let mut engine = llvm::ExecutionEngine::new(module);
+    let mut engine = llvm::ExecutionEngine::new(module).unwrap();
     engine.finalize();
-    let fptr: *const() = engine.get_pointer_to_function(&function);
-    assert!(!fptr.is_null());
-    unsafe {
-        println!("Function pointer: {:?}", fptr);
-        println!("Running JITted function...");
-        let foo: fn(i32, i32) -> i32 = mem::transmute(fptr);
-        let res = foo(12, 13);
-        println!("res: {}", res);
-    }
+    let fptr: *const() = engine.get_pointer_to_function(&function).unwrap();
+    println!("Function pointer: {:?}", fptr);
+    println!("Running JITted function...");
+    let foo: fn(i32, i32) -> i32 = unsafe { mem::transmute(fptr) };
+    let res = foo(12, 13);
+    println!("res: {}", res);
 }
